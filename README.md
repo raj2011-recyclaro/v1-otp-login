@@ -52,6 +52,17 @@ Note: `apiKey/authDomain/appId` are for frontend SDK usage. Backend verification
 - POST `/api/v1/auth/firebase-login`
 - POST `/api/v1/auth/refresh-token`
 - GET `/api/v1/users/me`
+- PUT `/api/v1/users/me`
+- POST `/api/v1/users/me/addresses`
+- GET `/api/v1/users/me/addresses`
+- PATCH `/api/v1/users/me/addresses/:addressId`
+- DELETE `/api/v1/users/me/addresses/:addressId`
+- POST `/api/v1/pickups`
+- GET `/api/v1/pickups`
+- GET `/api/v1/pickups/:id`
+- PATCH `/api/v1/pickups/:id/cancel`
+- POST `/api/v1/pickups/:id/rebook`
+- POST `/api/v1/pickups/:id/rate`
 
 ## Request Examples
 
@@ -80,6 +91,34 @@ POST `/api/v1/auth/refresh-token`
 GET `/api/v1/users/me`
 
 Header: `Authorization: Bearer <access_token>`
+
+### Update Profile
+
+PUT `/api/v1/users/me`
+
+```json
+{
+  "fullName": "Raj Jaiswal",
+  "country": "India"
+}
+```
+
+### Create Address
+
+POST `/api/v1/users/me/addresses`
+
+```json
+{
+  "label": "home",
+  "line1": "House 12, MG Road",
+  "line2": "Near Metro Station",
+  "city": "Pune",
+  "state": "Maharashtra",
+  "pincode": "411001",
+  "country": "India",
+  "isDefault": true
+}
+```
 
 ## Notes
 

@@ -2,7 +2,8 @@ const { z } = require('zod');
 
 const firebaseLoginSchema = z.object({
   body: z.object({
-    idToken: z.string().min(10)
+    idToken: z.string().min(10),
+    userType: z.enum(['user', 'admin', 'driver']).optional()
   }),
   query: z.object({}).optional().default({}),
   params: z.object({}).optional().default({})

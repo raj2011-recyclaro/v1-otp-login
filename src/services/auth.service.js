@@ -9,10 +9,10 @@ const {
 const userRepository = require('../repositories/user.repository');
 const sessionRepository = require('../repositories/session.repository');
 
-const findOrCreateUserByPhone = async (phone) => {
+const findOrCreateUserByPhone = async (phone, userType = 'user') => {
   let user = await userRepository.findByPhone(phone);
   if (!user) {
-    user = await userRepository.create(phone);
+    user = await userRepository.create(phone, userType);
   }
   return user;
 };
@@ -31,7 +31,7 @@ const createSessionTokens = async (userId) => {
   };
 };
 
-const firebaseLogin = async (idToken) => {
+const firebaseLogin = async (idToken, userType = 'user') => {
   let decodedToken;
   try {
     // Verify Firebase ID token from the mobile app.
@@ -51,7 +51,7 @@ const firebaseLogin = async (idToken) => {
     throw new ApiError(400, 'Phone number not found in Firebase token');
   }
 
-  const user = await findOrCreateUserByPhone(phone);
+  const user = await findOrCreateUserByPhone(phone, userType);
   const tokens = await createSessionTokens(user.id);
 
   return { user, tokens };

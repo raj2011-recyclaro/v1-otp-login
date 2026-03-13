@@ -1,8 +1,8 @@
 const authService = require('../services/auth.service');
 
 const firebaseLogin = async (req, res) => {
-  const { idToken } = req.body;
-  const payload = await authService.firebaseLogin(idToken);
+  const { idToken, userType } = req.body;
+  const payload = await authService.firebaseLogin(idToken, userType);
 
   return res.status(200).json({
     success: true,
