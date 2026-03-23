@@ -41,8 +41,10 @@ const firebaseLogin = async (idToken, userType = 'user') => {
     throw new ApiError(401, 'Invalid Firebase ID token');
   }
 
+  const expectedProjectId = admin.app().options.projectId || env.firebaseProjectId;
+
   // Ensure token belongs to the configured Firebase project.
-  if (env.firebaseProjectId && decodedToken.aud !== env.firebaseProjectId) {
+  if (expectedProjectId && decodedToken.aud !== expectedProjectId) {
     throw new ApiError(401, 'Firebase token project mismatch');
   }
 

@@ -19,14 +19,14 @@ src/
 ## Firebase Setup (Your Project)
 
 Your Firebase Web SDK project is:
-- projectId: `otp-login-575e2`
+- projectId: `sellyourscrap-53804`
 
 Backend setup:
-1. Set `FIREBASE_PROJECT_ID=otp-login-575e2` in `.env`
+1. Set `FIREBASE_PROJECT_ID=sellyourscrap-53804` in `.env`
 2. Put real service account JSON in `firebase-service-account.json`
 3. Keep `FIREBASE_SERVICE_ACCOUNT_PATH=./firebase-service-account.json`
 
-Note: `apiKey/authDomain/appId` are for frontend SDK usage. Backend verification uses Firebase Admin service account.
+Note: `apiKey/authDomain/appId` and `google-services.json` are for the mobile/frontend app. Backend verification uses the Firebase Admin service account JSON.
 
 ## Quick Start (Local)
 
@@ -46,6 +46,10 @@ Note: `apiKey/authDomain/appId` are for frontend SDK usage. Backend verification
    cp .env.example .env
 2. Start stack:
    docker-compose up --build
+
+## Lightsail Deployment
+
+See `LIGHTSAIL_DEPLOYMENT.md` for a beginner-friendly step-by-step deployment guide.
 
 ## API Endpoints
 

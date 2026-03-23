@@ -14,11 +14,12 @@ if (!fs.existsSync(serviceAccountFullPath)) {
 }
 
 const serviceAccount = require(serviceAccountFullPath);
+const firebaseProjectId = env.firebaseProjectId || serviceAccount.project_id;
 
 // Firebase Admin initialization for verifying Firebase ID tokens.
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  projectId: env.firebaseProjectId || serviceAccount.project_id
+  projectId: firebaseProjectId
 });
 
 module.exports = admin;
