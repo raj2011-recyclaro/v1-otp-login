@@ -9,6 +9,40 @@ const {
 const userRepository = require('../repositories/user.repository');
 const sessionRepository = require('../repositories/session.repository');
 
+const decodeJwtPayload = (token) => {
+  try {
+    const [, payload] = token.split('.');
+    if (!payload) return null;
+
+    const normalizedPayload = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const paddedPayload = normalizedPayload.padEnd(
+      normalizedPayload.length + ((4 - (normalizedPayload.length % 4)) % 4),
+      '='
+    );
+
+    return JSON.parse(Buffer.from(paddedPayload, 'base64').toString('utf8'));
+  } catch (_error) {
+    return null;
+  }
+};
+
+const buildTokenDebugContext = (idToken) => {
+  const payload = decodeJwtPayload(idToken);
+
+  if (!payload) {
+    return { tokenShape: 'unreadable' };
+  }
+
+  return {
+    aud: payload.aud,
+    iss: payload.iss,
+    sub: payload.sub,
+    phoneNumber: payload.phone_number || null,
+    authTime: payload.auth_time || null,
+    exp: payload.exp || null
+  };
+};
+
 const findOrCreateUserByPhone = async (phone, userType = 'user') => {
   let user = await userRepository.findByPhone(phone);
   if (!user) {
@@ -33,18 +67,31 @@ const createSessionTokens = async (userId) => {
 
 const firebaseLogin = async (idToken, userType = 'user') => {
   let decodedToken;
+  const expectedProjectId = admin.app().options.projectId || env.firebaseProjectId;
+  const tokenDebugContext = buildTokenDebugContext(idToken);
+
   try {
     // Verify Firebase ID token from the mobile app.
     decodedToken = await admin.auth().verifyIdToken(idToken, true);
   } catch (error) {
-    console.error('Firebase token verification failed:', error);
+    console.error('Firebase token verification failed', {
+      firebaseAdminCode: error.code || null,
+      firebaseAdminMessage: error.message || null,
+      expectedProjectId,
+      token: tokenDebugContext
+    });
     throw new ApiError(401, 'Invalid Firebase ID token');
   }
 
-  const expectedProjectId = admin.app().options.projectId || env.firebaseProjectId;
-
   // Ensure token belongs to the configured Firebase project.
   if (expectedProjectId && decodedToken.aud !== expectedProjectId) {
+    console.error('Firebase token project mismatch', {
+      expectedProjectId,
+      tokenAudience: decodedToken.aud,
+      tokenIssuer: decodedToken.iss,
+      phoneNumber: decodedToken.phone_number || null,
+      uid: decodedToken.uid || null
+    });
     throw new ApiError(401, 'Firebase token project mismatch');
   }
 
