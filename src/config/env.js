@@ -13,5 +13,15 @@ module.exports = {
   firebaseProjectId: process.env.FIREBASE_PROJECT_ID,
   firebaseServiceAccountPath: process.env.FIREBASE_SERVICE_ACCOUNT_PATH,
   otpRateLimitMax: Number(process.env.OTP_RATE_LIMIT_MAX || 5),
-  otpRateLimitWindowSec: Number(process.env.OTP_RATE_LIMIT_WINDOW_SEC || 300)
+  otpRateLimitWindowSec: Number(process.env.OTP_RATE_LIMIT_WINDOW_SEC || 300),
+  smtpHost: process.env.SMTP_HOST,
+  smtpPort: Number(process.env.SMTP_PORT || 587),
+  smtpSecure: process.env.SMTP_SECURE === 'true',
+  smtpUser: process.env.SMTP_USER,
+  smtpPass: process.env.SMTP_PASS,
+  smtpFromEmail: process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER,
+  pickupAckEmail: process.env.PICKUP_ACK_EMAIL || 'partner@recyclaro.com',
+  pickupAckCcEmails: process.env.PICKUP_ACK_CC_EMAILS
+    ? process.env.PICKUP_ACK_CC_EMAILS.split(',').map((email) => email.trim()).filter(Boolean)
+    : []
 };

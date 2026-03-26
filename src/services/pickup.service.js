@@ -1,6 +1,7 @@
 const ApiError = require('../utils/ApiError');
 const pickupRepository = require('../repositories/pickup.repository');
 const userRepository = require('../repositories/user.repository');
+const mailService = require('./mail.service');
 
 const PICKUP_STATUS = {
   BOOKED: 'BOOKED',
@@ -51,8 +52,7 @@ const getAddressSnapshotForBooking = async (userId, payload) => {
 
 const createPickup = async (userId, payload) => {
   const addressSnapshot = await getAddressSnapshotForBooking(userId, payload);
-
-  return pickupRepository.createPickup(userId, {
+  const pickup = await pickupRepository.createPickup(userId, {
     category: payload.category,
     weight: payload.weight,
     transportMode: payload.transportMode,
@@ -62,6 +62,17 @@ const createPickup = async (userId, payload) => {
     scheduledAt: payload.scheduledAt || null,
     notes: payload.notes || null
   });
+  const user = await userRepository.findById(userId);
+
+  if (user) {
+    try {
+      await mailService.sendPickupAcknowledgement({ pickup, user });
+    } catch (error) {
+      console.error('Failed to send pickup acknowledgement email:', error.message);
+    }
+  }
+
+  return pickup;
 };
 
 const listPickups = async (userId, query) => {
@@ -118,7 +129,7 @@ const rebookPickup = async (userId, pickupId, payload) => {
     throw new ApiError(400, 'Only cancelled pickups can be rebooked');
   }
 
-  return pickupRepository.createPickup(userId, {
+  const rebookedPickup = await pickupRepository.createPickup(userId, {
     category: payload.category ?? pickup.category,
     weight: payload.weight ?? pickup.weight,
     transportMode: payload.transportMode ?? pickup.transportMode,
@@ -129,6 +140,17 @@ const rebookPickup = async (userId, pickupId, payload) => {
     notes: payload.notes ?? pickup.notes ?? null,
     rebookedFromPickupId: pickup.id
   });
+  const user = await userRepository.findById(userId);
+
+  if (user) {
+    try {
+      await mailService.sendPickupAcknowledgement({ pickup: rebookedPickup, user });
+    } catch (error) {
+      console.error('Failed to send pickup acknowledgement email:', error.message);
+    }
+  }
+
+  return rebookedPickup;
 };
 
 const ratePickup = async (userId, pickupId, payload) => {
