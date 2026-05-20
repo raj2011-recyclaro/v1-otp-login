@@ -6,8 +6,8 @@ if (!env.jwtSecret) {
   throw new Error('JWT_SECRET is required');
 }
 
-const signAccessToken = (userId) => {
-  return jwt.sign({ sub: userId, type: 'access' }, env.jwtSecret, {
+const signAccessToken = (user) => {
+  return jwt.sign({ sub: user.id, role: user.userType, type: 'access' }, env.jwtSecret, {
     expiresIn: env.jwtExpiresIn
   });
 };

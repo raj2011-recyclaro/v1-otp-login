@@ -9,6 +9,12 @@ const {
 const userRepository = require('../repositories/user.repository');
 const sessionRepository = require('../repositories/session.repository');
 
+const USER_ROLE = {
+  ADMIN: 'admin',
+  BUYER: 'buyer',
+  LEGACY_USER: 'user'
+};
+
 const decodeJwtPayload = (token) => {
   try {
     const [, payload] = token.split('.');
@@ -43,20 +49,48 @@ const buildTokenDebugContext = (idToken) => {
   };
 };
 
-const findOrCreateUserByPhone = async (phone, userType = 'user') => {
+const normalizeRole = (userType) => {
+  if (!userType || userType === USER_ROLE.BUYER || userType === USER_ROLE.LEGACY_USER) {
+    return USER_ROLE.BUYER;
+  }
+
+  return userType;
+};
+
+const assertAdminLoginCode = (adminCode) => {
+  if (!env.adminLoginCodes.length) {
+    throw new ApiError(500, 'Admin login is not configured');
+  }
+
+  if (!adminCode || !env.adminLoginCodes.includes(adminCode.trim())) {
+    throw new ApiError(403, 'Invalid admin code');
+  }
+};
+
+const findOrCreateUserByPhone = async (phone, userType = USER_ROLE.BUYER) => {
   let user = await userRepository.findByPhone(phone);
   if (!user) {
     user = await userRepository.create(phone, userType);
+    return user;
   }
+
+  const currentRole = normalizeRole(user.userType);
+
+  if (currentRole === userType && user.userType !== userType) {
+    user = await userRepository.updateRole(user.id, userType);
+  } else if (currentRole !== userType) {
+    throw new ApiError(403, `This phone number is already registered as ${currentRole}`);
+  }
+
   return user;
 };
 
-const createSessionTokens = async (userId) => {
-  const accessToken = signAccessToken(userId);
+const createSessionTokens = async (user) => {
+  const accessToken = signAccessToken(user);
   const refreshToken = generateRefreshToken();
   const refreshTokenHash = hashToken(refreshToken);
 
-  await sessionRepository.create(userId, refreshTokenHash);
+  await sessionRepository.create(user.id, refreshTokenHash);
 
   return {
     accessToken,
@@ -65,10 +99,15 @@ const createSessionTokens = async (userId) => {
   };
 };
 
-const firebaseLogin = async (idToken, userType = 'user') => {
+const firebaseLogin = async (idToken, userType = USER_ROLE.BUYER, adminCode = null) => {
   let decodedToken;
   const expectedProjectId = admin.app().options.projectId || env.firebaseProjectId;
   const tokenDebugContext = buildTokenDebugContext(idToken);
+  const requestedRole = normalizeRole(userType);
+
+  if (requestedRole === USER_ROLE.ADMIN) {
+    assertAdminLoginCode(adminCode);
+  }
 
   try {
     // Verify Firebase ID token from the mobile app.
@@ -100,10 +139,17 @@ const firebaseLogin = async (idToken, userType = 'user') => {
     throw new ApiError(400, 'Phone number not found in Firebase token');
   }
 
-  const user = await findOrCreateUserByPhone(phone, userType);
-  const tokens = await createSessionTokens(user.id);
+  const user = await findOrCreateUserByPhone(phone, requestedRole);
+  const tokens = await createSessionTokens(user);
 
-  return { user, tokens };
+  return {
+    user,
+    tokens,
+    meta: {
+      operationsProfileComplete:
+        requestedRole === USER_ROLE.ADMIN || Boolean(user.operatingCity)
+    }
+  };
 };
 
 const refreshToken = async (incomingRefreshToken) => {
@@ -116,7 +162,13 @@ const refreshToken = async (incomingRefreshToken) => {
 
   // Rotate refresh token to reduce replay risk.
   await sessionRepository.deleteById(session.id);
-  const tokens = await createSessionTokens(session.userId);
+  const user = await userRepository.findById(session.userId);
+
+  if (!user) {
+    throw new ApiError(401, 'User no longer exists');
+  }
+
+  const tokens = await createSessionTokens(user);
 
   return tokens;
 };

@@ -1,4 +1,4 @@
-# Mobile Integration Flow (OTP -> Profile -> Pickups)
+# Mobile Integration Flow (OTP -> Profile -> Operations)
 
 Base URL: `https://<your-api-domain>/api/v1`
 
@@ -11,7 +11,17 @@ Base URL: `https://<your-api-domain>/api/v1`
 - Body:
 ```json
 {
-  "idToken": "<firebase_id_token>"
+  "idToken": "<firebase_id_token>",
+  "userType": "buyer"
+}
+```
+- `userType: "user"` is also accepted as a legacy alias and is treated as `buyer`.
+- For admins:
+```json
+{
+  "idToken": "<firebase_id_token>",
+  "userType": "admin",
+  "adminCode": "<admin_login_code>"
 }
 ```
 - Save:
@@ -22,38 +32,29 @@ Base URL: `https://<your-api-domain>/api/v1`
 ## 3) Profile completion screen (mandatory)
 Immediately call:
 - `GET /users/me`
-If `fullName` or `country` is missing, show profile form and submit:
+If `fullName`, `country`, or buyer `operatingCity` is missing, show profile form and submit:
 - `PUT /users/me`
 ```json
 {
   "fullName": "Raj Jaiswal",
-  "country": "India"
-}
-```
-
-## 4) Address setup
-If no address exists:
-- `POST /users/me/addresses`
-```json
-{
-  "label": "home",
-  "line1": "House 12, MG Road",
-  "line2": "Near Metro Station",
-  "city": "Pune",
-  "state": "Maharashtra",
-  "pincode": "411001",
   "country": "India",
-  "isDefault": true
+  "operatingCity": "Noida"
 }
 ```
 
-## 5) Pickup flow
-- Create: `POST /pickups` with `addressId` (recommended)
-- List: `GET /pickups?status=BOOKED&page=1&limit=10`
-- Detail+timeline: `GET /pickups/:id`
-- Cancel: `PATCH /pickups/:id/cancel`
-- Rebook: `POST /pickups/:id/rebook`
-- Rate after completion: `POST /pickups/:id/rate`
+## 4) Buyer operations flow
+- Queue in buyer city: `GET /operations/pickups?scope=available&page=1&limit=10`
+- Accepted by me: `GET /operations/pickups?scope=accepted&page=1&limit=10`
+- Detail+timeline: `GET /operations/pickups/:id`
+- Accept: `POST /operations/pickups/:id/accept`
+- Skip: `POST /operations/pickups/:id/skip`
+
+## 5) Admin operations flow
+- Full queue: `GET /operations/pickups?page=1&limit=10`
+- Filter by city or status: `GET /operations/pickups?city=Noida&status=BUYER_ACCEPTED`
+- Take over after buyer accepts: `POST /operations/pickups/:id/takeover`
+- Move status: `PATCH /operations/pickups/:id/status`
+- Buyer directory: `GET /operations/buyers?city=Noida`
 
 ## 6) Refresh token flow
 When API returns `401` for expired access token:

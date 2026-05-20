@@ -6,6 +6,8 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'pickup_status') THEN
     CREATE TYPE pickup_status AS ENUM (
       'BOOKED',
+      'BUYER_ACCEPTED',
+      'ADMIN_IN_PROGRESS',
       'DRIVER_ASSIGNED',
       'DRIVER_EN_ROUTE',
       'ARRIVED',
@@ -13,6 +15,32 @@ BEGIN
       'PAYMENT_CREDITED',
       'CANCELLED'
     );
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'pickup_status')
+    AND NOT EXISTS (
+      SELECT 1
+      FROM pg_enum
+      WHERE enumtypid = 'pickup_status'::regtype
+        AND enumlabel = 'BUYER_ACCEPTED'
+    ) THEN
+    ALTER TYPE pickup_status ADD VALUE 'BUYER_ACCEPTED';
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'pickup_status')
+    AND NOT EXISTS (
+      SELECT 1
+      FROM pg_enum
+      WHERE enumtypid = 'pickup_status'::regtype
+        AND enumlabel = 'ADMIN_IN_PROGRESS'
+    ) THEN
+    ALTER TYPE pickup_status ADD VALUE 'ADMIN_IN_PROGRESS';
   END IF;
 END $$;
 
@@ -35,18 +63,15 @@ ADD COLUMN IF NOT EXISTS country VARCHAR(80);
 ALTER TABLE users
 ADD COLUMN IF NOT EXISTS user_type VARCHAR(20) NOT NULL DEFAULT 'user';
 
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_constraint
-    WHERE conname = 'users_user_type_check'
-  ) THEN
-    ALTER TABLE users
-    ADD CONSTRAINT users_user_type_check
-    CHECK (user_type IN ('user', 'admin', 'driver'));
-  END IF;
-END $$;
+ALTER TABLE users
+ADD COLUMN IF NOT EXISTS operating_city VARCHAR(80);
+
+ALTER TABLE users
+DROP CONSTRAINT IF EXISTS users_user_type_check;
+
+ALTER TABLE users
+ADD CONSTRAINT users_user_type_check
+CHECK (user_type IN ('user', 'buyer', 'admin', 'driver'));
 
 -- Sessions table stores hashed refresh tokens for secure token rotation.
 CREATE TABLE IF NOT EXISTS sessions (
@@ -75,6 +100,10 @@ CREATE TABLE IF NOT EXISTS pickups (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   status pickup_status NOT NULL DEFAULT 'BOOKED',
+  buyer_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  buyer_accepted_at TIMESTAMPTZ,
+  admin_owner_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  admin_assigned_at TIMESTAMPTZ,
   category VARCHAR(80),
   weight_kg NUMERIC(10, 2),
   transport_mode VARCHAR(20),
@@ -107,16 +136,28 @@ CREATE TABLE IF NOT EXISTS pickup_ratings (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS pickup_buyer_skips (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pickup_id UUID NOT NULL REFERENCES pickups(id) ON DELETE CASCADE,
+  buyer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  reason VARCHAR(300),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (pickup_id, buyer_id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_addresses_user_id ON user_addresses(user_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_user_addresses_default_unique
   ON user_addresses(user_id)
   WHERE is_default = TRUE;
+CREATE INDEX IF NOT EXISTS idx_users_operating_city ON users(operating_city);
 CREATE INDEX IF NOT EXISTS idx_pickups_user_id_created_at ON pickups(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_pickups_status ON pickups(status);
 CREATE INDEX IF NOT EXISTS idx_pickup_status_events_pickup_id_created_at
   ON pickup_status_events(pickup_id, created_at ASC);
+CREATE INDEX IF NOT EXISTS idx_pickup_buyer_skips_buyer_id
+  ON pickup_buyer_skips(buyer_id, created_at DESC);
 
 ALTER TABLE pickups
 ADD COLUMN IF NOT EXISTS category VARCHAR(80);
@@ -132,6 +173,23 @@ ADD COLUMN IF NOT EXISTS pickup_date DATE;
 
 ALTER TABLE pickups
 ADD COLUMN IF NOT EXISTS pickup_time TIME;
+
+ALTER TABLE pickups
+ADD COLUMN IF NOT EXISTS buyer_id UUID REFERENCES users(id) ON DELETE SET NULL;
+
+ALTER TABLE pickups
+ADD COLUMN IF NOT EXISTS buyer_accepted_at TIMESTAMPTZ;
+
+ALTER TABLE pickups
+ADD COLUMN IF NOT EXISTS admin_owner_id UUID REFERENCES users(id) ON DELETE SET NULL;
+
+ALTER TABLE pickups
+ADD COLUMN IF NOT EXISTS admin_assigned_at TIMESTAMPTZ;
+
+CREATE INDEX IF NOT EXISTS idx_pickups_buyer_id ON pickups(buyer_id);
+CREATE INDEX IF NOT EXISTS idx_pickups_admin_owner_id ON pickups(admin_owner_id);
+CREATE INDEX IF NOT EXISTS idx_pickups_city_status
+  ON pickups ((LOWER(TRIM(COALESCE(address_snapshot->>'city', '')))), status);
 
 DO $$
 BEGIN

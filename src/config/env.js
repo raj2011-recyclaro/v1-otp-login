@@ -14,6 +14,11 @@ module.exports = {
   firebaseServiceAccountPath: process.env.FIREBASE_SERVICE_ACCOUNT_PATH,
   otpRateLimitMax: Number(process.env.OTP_RATE_LIMIT_MAX || 5),
   otpRateLimitWindowSec: Number(process.env.OTP_RATE_LIMIT_WINDOW_SEC || 300),
+  adminLoginCodes: process.env.ADMIN_LOGIN_CODES
+    ? process.env.ADMIN_LOGIN_CODES.split(',').map((code) => code.trim()).filter(Boolean)
+    : process.env.ADMIN_LOGIN_CODE
+      ? [process.env.ADMIN_LOGIN_CODE.trim()].filter(Boolean)
+      : [],
   smtpHost: process.env.SMTP_HOST,
   smtpPort: Number(process.env.SMTP_PORT || 587),
   smtpSecure: process.env.SMTP_SECURE === 'true',

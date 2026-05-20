@@ -7,12 +7,11 @@ const getMyProfile = async (userId) => {
 };
 
 const updateMyProfile = async (userId, payload) => {
-  const user = await userRepository.updateProfile(
-    userId,
-    payload.fullName,
-    payload.country,
-    payload.userType
-  );
+  const user = await userRepository.updateProfile(userId, {
+    fullName: payload.fullName,
+    country: payload.country,
+    operatingCity: payload.operatingCity
+  });
   return user;
 };
 

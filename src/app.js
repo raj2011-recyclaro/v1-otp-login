@@ -7,9 +7,14 @@ const routes = require('./routes');
 const errorMiddleware = require('./middlewares/error.middleware');
 
 const app = express();
+const corsOptions = {
+  origin: '*',
+  // Leave `allowedHeaders` unset so the middleware reflects whatever headers
+  // the browser requests during preflight, which keeps headers fully open.
+};
 
 app.use(helmet());
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '1mb' }));
 app.use(morgan('combined'));
 

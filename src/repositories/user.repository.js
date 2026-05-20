@@ -22,19 +22,57 @@ const create = async (phone, userType = 'user') => {
   return userModel.fromRow(result.rows[0]);
 };
 
-const updateProfile = async (id, fullName, country, userType) => {
+const updateRole = async (id, userType) => {
   const result = await pool.query(
     `
       UPDATE users
       SET
-        full_name = $2,
-        country = $3,
-        user_type = COALESCE($4, user_type),
+        user_type = $2,
         updated_at = NOW()
       WHERE id = $1
       RETURNING *
     `,
-    [id, fullName, country, userType || null]
+    [id, userType]
+  );
+
+  if (!result.rows.length) return null;
+  return userModel.fromRow(result.rows[0]);
+};
+
+const updateProfile = async (id, payload) => {
+  const fields = [];
+  const values = [];
+  let idx = 2;
+
+  if (payload.fullName !== undefined) {
+    fields.push(`full_name = $${idx++}`);
+    values.push(payload.fullName);
+  }
+
+  if (payload.country !== undefined) {
+    fields.push(`country = $${idx++}`);
+    values.push(payload.country);
+  }
+
+  if (payload.operatingCity !== undefined) {
+    fields.push(`operating_city = $${idx++}`);
+    values.push(payload.operatingCity);
+  }
+
+  if (!fields.length) {
+    return findById(id);
+  }
+
+  fields.push('updated_at = NOW()');
+
+  const result = await pool.query(
+    `
+      UPDATE users
+      SET ${fields.join(', ')}
+      WHERE id = $1
+      RETURNING *
+    `,
+    [id, ...values]
   );
 
   if (!result.rows.length) return null;
@@ -197,14 +235,52 @@ const deleteAddress = async (addressId, userId) => {
   return Boolean(result.rows.length);
 };
 
+const listBuyers = async ({ city = null, page = 1, limit = 20 }) => {
+  const offset = (page - 1) * limit;
+  const normalizedCity = city ? city.trim().toLowerCase() : null;
+
+  const countResult = await pool.query(
+    `
+      SELECT COUNT(*)::INT AS total
+      FROM users
+      WHERE user_type = 'buyer'
+        AND ($1::TEXT IS NULL OR LOWER(TRIM(COALESCE(operating_city, ''))) = $1)
+    `,
+    [normalizedCity]
+  );
+
+  const result = await pool.query(
+    `
+      SELECT *
+      FROM users
+      WHERE user_type = 'buyer'
+        AND ($1::TEXT IS NULL OR LOWER(TRIM(COALESCE(operating_city, ''))) = $1)
+      ORDER BY updated_at DESC, created_at DESC
+      LIMIT $2 OFFSET $3
+    `,
+    [normalizedCity, limit, offset]
+  );
+
+  return {
+    items: result.rows.map(userModel.fromRow),
+    pagination: {
+      page,
+      limit,
+      total: countResult.rows[0]?.total || 0
+    }
+  };
+};
+
 module.exports = {
   findByPhone,
   findById,
   create,
+  updateRole,
   updateProfile,
   createAddress,
   findAddressesByUserId,
   findAddressById,
   updateAddress,
-  deleteAddress
+  deleteAddress,
+  listBuyers
 };

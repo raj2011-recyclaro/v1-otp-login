@@ -3,11 +3,15 @@ const { z } = require('zod');
 const addressLabels = ['home', 'work', 'other'];
 
 const updateMyProfileSchema = z.object({
-  body: z.object({
-    fullName: z.string().trim().min(2).max(120),
-    country: z.string().trim().min(2).max(80),
-    userType: z.enum(['user', 'admin', 'driver']).optional()
-  }),
+  body: z
+    .object({
+      fullName: z.string().trim().min(2).max(120).optional(),
+      country: z.string().trim().min(2).max(80).optional(),
+      operatingCity: z.string().trim().min(2).max(80).optional()
+    })
+    .refine((data) => Object.keys(data).length > 0, {
+      message: 'At least one field is required'
+    }),
   query: z.object({}).optional().default({}),
   params: z.object({}).optional().default({})
 });
